@@ -1,22 +1,23 @@
-import { getDefaultConfig } from 'expo/metro-config';
-import os from 'os';
-import path from 'path';
-
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Metro configuration for Expo SDK 53.
  * - Sets cache directory to OS tmp to avoid stale cache deserialize issues in CI.
+ * NOTE: This file runs under Node (CJS). Using require/module.exports intentionally.
  */
-const config = getDefaultConfig(__dirname);
+const { getDefaultConfig } = require('expo/metro-config');
+const os = require('os');
+const path = require('path');
 
-// Provide a minimal local type to avoid using `any`
-type MetroFileStoreCtor = new (opts: { root: string }) => unknown;
+const config = getDefaultConfig(__dirname);
 
 // Ensure the cache root goes to tmp to avoid serialization mismatch
 (async () => {
   try {
-    const metroCache = (await import('metro-cache')) as { FileStore: MetroFileStoreCtor };
+    const metroCache = await import('metro-cache');
     const { FileStore } = metroCache;
-    // @ts-expect-error: cacheStores is not typed in the exported config shape
+    // cacheStores is not typed in the exported config shape; set at runtime
+    // This reduces stale cache deserialization errors in CI
+    // @ts-expect-error - cacheStores is not part of typed config
     config.cacheStores = [
       new FileStore({
         root: path.join(os.tmpdir(), 'metro-cache'),
@@ -27,8 +28,8 @@ type MetroFileStoreCtor = new (opts: { root: string }) => unknown;
   }
 })();
 
-// Silence some noisy warnings on web
-// @ts-expect-error reporter is not strictly typed here; providing a noop update
+// Silence some noisy warnings on web by providing a noop reporter
+// @ts-expect-error - reporter type not exposed here
 config.reporter = { update() {} };
 
-export default config;
+module.exports = config;
